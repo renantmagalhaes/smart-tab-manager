@@ -9,8 +9,9 @@ const elements = {
   keywordSection: document.getElementById('keywordSection'),
   keywordInput: document.getElementById('keywordInput'),
   groupNowBtn: document.getElementById('groupNowBtn'),
-  vivaldiSettings: document.getElementById('vivaldiSettings'),
   vivaldiStackingToggle: document.getElementById('vivaldiStackingToggle'),
+  extraOptionsHeader: document.getElementById('extraOptionsHeader'),
+  extraOptionsContent: document.getElementById('extraOptionsContent'),
   // closeAllBtn: document.getElementById('closeAllBtn'),
   // openAllBtn: document.getElementById('openAllBtn')
 };
@@ -28,17 +29,14 @@ chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'group
   
   toggleKeywordSection(elements.groupMode.value);
   toggleThresholdSettings(elements.collapseToggle.checked);
-  checkVivaldi();
 });
 
-// Detect Vivaldi to show/hide specific settings
-async function checkVivaldi() {
-  const tabs = await chrome.tabs.query({ windowType: 'normal' });
-  const isVivaldi = tabs.length > 0 && ('vivExtData' in tabs[0] || 'splitViewId' in tabs[0]);
-  if (isVivaldi) {
-    elements.vivaldiSettings.classList.remove('hidden');
-  }
-}
+// Accordion toggle
+elements.extraOptionsHeader.addEventListener('click', () => {
+  const isHidden = elements.extraOptionsContent.classList.contains('hidden');
+  elements.extraOptionsContent.classList.toggle('hidden');
+  elements.extraOptionsHeader.querySelector('.chevron').style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+});
 
 // Event Listeners
 elements.sortStrategy.addEventListener('change', () => {

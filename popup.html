@@ -17,17 +17,6 @@
     </header>
 
     <main>
-      <section id="vivaldiSettings" class="control-group hidden">
-        <div class="label-row">
-          <label for="vivaldiStackingToggle">Native Stacking (Vivaldi)</label>
-          <label class="toggle-switch">
-            <input type="checkbox" id="vivaldiStackingToggle">
-            <span class="slider"></span>
-          </label>
-        </div>
-        <p class="description">Use Vivaldi's native "Folders" instead of standard groups.</p>
-      </section>
-
       <section class="control-group">
         <div class="label-row">
           <label for="autoGroupToggle">Auto-group tabs</label>
@@ -96,6 +85,25 @@
           <button id="openAllBtn" class="secondary-btn">Open All</button>
         </div> -->
         <button id="groupNowBtn" class="premium-btn">Group Now</button>
+      </div>
+
+      <div class="extra-options">
+        <div id="extraOptionsHeader" class="extra-options-header">
+          <span>Extra Options</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div id="extraOptionsContent" class="extra-options-content hidden">
+          <div class="control-group no-bg">
+            <div class="label-row">
+              <label for="vivaldiStackingToggle">Native Stacking (Vivaldi)</label>
+              <label class="toggle-switch">
+                <input type="checkbox" id="vivaldiStackingToggle">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <p class="description">Use Vivaldi's native "Folders". (Ignored in other browsers)</p>
+          </div>
+        </div>
       </div>
     </main>
 

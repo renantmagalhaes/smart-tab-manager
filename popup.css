@@ -278,3 +278,49 @@ kbd {
   border: 1px solid var(--border);
   font-family: monospace;
 }
+
+.extra-options {
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.extra-options-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.extra-options-header:hover {
+  color: var(--text);
+  border-color: var(--primary);
+}
+
+.chevron {
+  font-size: 0.6rem;
+  transition: transform 0.3s ease;
+}
+
+.extra-options-content {
+  margin-top: 12px;
+}
+
+.no-bg {
+  background: transparent !important;
+  border-color: transparent !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.hidden {
+  display: none !important;
+}
