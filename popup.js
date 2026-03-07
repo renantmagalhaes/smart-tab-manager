@@ -9,12 +9,14 @@ const elements = {
   keywordSection: document.getElementById('keywordSection'),
   keywordInput: document.getElementById('keywordInput'),
   groupNowBtn: document.getElementById('groupNowBtn'),
+  vivaldiSettings: document.getElementById('vivaldiSettings'),
+  vivaldiStackingToggle: document.getElementById('vivaldiStackingToggle'),
   // closeAllBtn: document.getElementById('closeAllBtn'),
   // openAllBtn: document.getElementById('openAllBtn')
 };
 
 // Initialize settings from storage
-chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'groupMode', 'sortStrategy', 'keywords'], (settings) => {
+chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'groupMode', 'sortStrategy', 'keywords', 'vivaldiNativeStacking'], (settings) => {
   elements.autoGroupToggle.checked = settings.autoGroup || false;
   elements.collapseToggle.checked = settings.collapseGroups ?? true;
   elements.totalThreshold.value = settings.totalThreshold || 5;
@@ -22,10 +24,21 @@ chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'group
   elements.groupMode.value = settings.groupMode || 'domain';
   elements.sortStrategy.value = settings.sortStrategy || 'alphabetical';
   elements.keywordInput.value = (settings.keywords || []).join(', ');
+  elements.vivaldiStackingToggle.checked = settings.vivaldiNativeStacking ?? true;
   
   toggleKeywordSection(elements.groupMode.value);
   toggleThresholdSettings(elements.collapseToggle.checked);
+  checkVivaldi();
 });
+
+// Detect Vivaldi to show/hide specific settings
+async function checkVivaldi() {
+  const tabs = await chrome.tabs.query({ windowType: 'normal' });
+  const isVivaldi = tabs.length > 0 && ('vivExtData' in tabs[0] || 'splitViewId' in tabs[0]);
+  if (isVivaldi) {
+    elements.vivaldiSettings.classList.remove('hidden');
+  }
+}
 
 // Event Listeners
 elements.sortStrategy.addEventListener('change', () => {
@@ -59,6 +72,10 @@ elements.groupMode.addEventListener('change', () => {
 elements.keywordInput.addEventListener('input', () => {
   const keywords = elements.keywordInput.value.split(',').map(k => k.trim()).filter(k => k !== '');
   chrome.storage.sync.set({ keywords });
+});
+
+elements.vivaldiStackingToggle.addEventListener('change', () => {
+  chrome.storage.sync.set({ vivaldiNativeStacking: elements.vivaldiStackingToggle.checked });
 });
 
 /* 

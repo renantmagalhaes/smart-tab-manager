@@ -17,12 +17,17 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
   console.log(`[SmartTabManager] groupTabs triggered. Manual: ${manualTrigger}, ForcedTab: ${forcedActiveTabId}, ForceMode: ${forceMode}`);
 
   const settings = await chrome.storage.sync.get([
-    'groupMode', 'keywords', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'autoGroup', 'sortStrategy'
+    'groupMode', 'keywords', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'autoGroup', 'sortStrategy', 'vivaldiNativeStacking'
   ]);
   const allTabs = await chrome.tabs.query({ currentWindow: true, pinned: false });
   const existingGroups = await chrome.tabGroups.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
   
+  const vivaldiNative = settings.vivaldiNativeStacking ?? true;
+
   console.log(`[SmartTabManager] Browser: ${browserIsVivaldi ? 'Vivaldi' : 'Chrome/Other'}`);
+  if (browserIsVivaldi && vivaldiNative) {
+    console.log(`[SmartTabManager] Vivaldi Native Stacking: Enabled`);
+  }
   if (allTabs.length > 0) {
     const sampleTab = allTabs[0];
     console.log(`[SmartTabManager] Sample Tab Keys:`, Object.keys(sampleTab));
@@ -186,33 +191,41 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
           for (const tabId of tabsInGroup) {
             await chrome.tabs.move(tabId, { index: currentIndex });
             currentIndex++;
-            // Vivaldi needs a tiny bit of time to breathe between moves
-            if (browserIsVivaldi) {
-              await new Promise(r => setTimeout(r, 20));
-              // EXPERIMENT: Try to set Vivaldi-specific stack data
+            
+            // VIVALDI NATIVE STACKING WORKAROUND
+            if (browserIsVivaldi && vivaldiNative) {
+              await new Promise(r => setTimeout(r, 20)); // Breathe
               try {
                 const vivData = JSON.stringify({
                   group: `smart-group-${key}`,
                   fixedGroupTitle: key
                 });
                 await chrome.tabs.update(tabId, { vivExtData: vivData });
-                console.log(`[SmartTabManager] Attempted to set vivExtData for tab ${tabId}`);
-              } catch (e) {
-                // This might fail if the API is restricted, which is expected
-              }
+              } catch (e) {}
             }
           }
-          groupId = await chrome.tabs.group({ 
-            tabIds: tabsInGroup, 
-            groupId: groupId 
-          });
 
-          // In Vivaldi, setting the title immediately after grouping helps it stick
-          if (browserIsVivaldi) {
-            await chrome.tabGroups.update(groupId, { title: key, color: getColorForKey(key) });
+          // ONLY CREATE GROUPS IF:
+          // 1. We are not in Vivaldi
+          // 2. OR we are in Vivaldi and Native Stacking is ENABLED
+          if (!browserIsVivaldi || (browserIsVivaldi && vivaldiNative)) {
+            groupId = await chrome.tabs.group({ 
+              tabIds: tabsInGroup, 
+              groupId: groupId 
+            });
+
+            if (browserIsVivaldi) {
+              // Forced sticking for Vivaldi
+              await chrome.tabGroups.update(groupId, { title: key, color: getColorForKey(key) });
+            }
+          } else {
+            // Un-group tabs if they were in a group before and we are turning stacking OFF
+            try {
+              await chrome.tabs.ungroup(tabsInGroup);
+            } catch (e) {}
+            groupId = undefined;
           }
         } else {
-          // Just track position for next groups and use existing groupId
           currentIndex += tabsInGroup.length;
         }
 
