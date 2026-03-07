@@ -61,13 +61,29 @@
         </div>
       </section>
 
+      <section class="control-group">
+        <label for="sortStrategy">Group Ordering</label>
+        <div class="select-wrapper">
+          <select id="sortStrategy">
+            <option value="alphabetical">Fixed (Alphabetical)</option>
+            <option value="manual">Fixed (Manual re-arrange)</option>
+            <option value="activeFirst">Dynamic (Active first)</option>
+          </select>
+        </div>
+        <p class="description">How folders are ordered in the tab bar.</p>
+      </section>
+
       <section id="keywordSection" class="control-group hidden">
         <label for="keywordInput">Keywords (Comma separated)</label>
         <input type="text" id="keywordInput" placeholder="e.g. Work, Social, News">
         <p class="description">Tabs matching these will be grouped together.</p>
       </section>
 
-      <div class="actions">
+      <div class="actions vertical-gap">
+        <!-- <div class="button-row">
+          <button id="closeAllBtn" class="secondary-btn">Close All</button>
+          <button id="openAllBtn" class="secondary-btn">Open All</button>
+        </div> -->
         <button id="groupNowBtn" class="premium-btn">Group Now</button>
       </div>
     </main>

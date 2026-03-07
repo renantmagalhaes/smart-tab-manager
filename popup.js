@@ -5,18 +5,22 @@ const elements = {
   totalThreshold: document.getElementById('totalThreshold'),
   groupThreshold: document.getElementById('groupThreshold'),
   groupMode: document.getElementById('groupMode'),
+  sortStrategy: document.getElementById('sortStrategy'),
   keywordSection: document.getElementById('keywordSection'),
   keywordInput: document.getElementById('keywordInput'),
-  groupNowBtn: document.getElementById('groupNowBtn')
+  groupNowBtn: document.getElementById('groupNowBtn'),
+  // closeAllBtn: document.getElementById('closeAllBtn'),
+  // openAllBtn: document.getElementById('openAllBtn')
 };
 
 // Initialize settings from storage
-chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'groupMode', 'keywords'], (settings) => {
+chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'groupMode', 'sortStrategy', 'keywords'], (settings) => {
   elements.autoGroupToggle.checked = settings.autoGroup || false;
   elements.collapseToggle.checked = settings.collapseGroups ?? true;
   elements.totalThreshold.value = settings.totalThreshold || 5;
   elements.groupThreshold.value = settings.groupThreshold || 3;
   elements.groupMode.value = settings.groupMode || 'domain';
+  elements.sortStrategy.value = settings.sortStrategy || 'alphabetical';
   elements.keywordInput.value = (settings.keywords || []).join(', ');
   
   toggleKeywordSection(elements.groupMode.value);
@@ -24,6 +28,10 @@ chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'group
 });
 
 // Event Listeners
+elements.sortStrategy.addEventListener('change', () => {
+  chrome.storage.sync.set({ sortStrategy: elements.sortStrategy.value });
+});
+
 elements.autoGroupToggle.addEventListener('change', () => {
   chrome.storage.sync.set({ autoGroup: elements.autoGroupToggle.checked });
 });
@@ -52,6 +60,32 @@ elements.keywordInput.addEventListener('input', () => {
   const keywords = elements.keywordInput.value.split(',').map(k => k.trim()).filter(k => k !== '');
   chrome.storage.sync.set({ keywords });
 });
+
+/* 
+elements.closeAllBtn.addEventListener('click', () => {
+  const originalText = elements.closeAllBtn.innerText;
+  elements.closeAllBtn.innerText = 'Closing...';
+  elements.closeAllBtn.disabled = true;
+  chrome.runtime.sendMessage({ action: 'forceCollapseAll' }, () => {
+    setTimeout(() => {
+      elements.closeAllBtn.innerText = originalText;
+      elements.closeAllBtn.disabled = false;
+    }, 500);
+  });
+});
+
+elements.openAllBtn.addEventListener('click', () => {
+  const originalText = elements.openAllBtn.innerText;
+  elements.openAllBtn.innerText = 'Opening...';
+  elements.openAllBtn.disabled = true;
+  chrome.runtime.sendMessage({ action: 'forceExpandAll' }, () => {
+    setTimeout(() => {
+      elements.openAllBtn.innerText = originalText;
+      elements.openAllBtn.disabled = false;
+    }, 500);
+  });
+});
+*/
 
 elements.groupNowBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'triggerGroup' }, (response) => {
