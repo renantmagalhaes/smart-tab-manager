@@ -1,6 +1,9 @@
 const elements = {
   autoGroupToggle: document.getElementById('autoGroupToggle'),
   collapseToggle: document.getElementById('collapseToggle'),
+  thresholdSettings: document.getElementById('thresholdSettings'),
+  totalThreshold: document.getElementById('totalThreshold'),
+  groupThreshold: document.getElementById('groupThreshold'),
   groupMode: document.getElementById('groupMode'),
   keywordSection: document.getElementById('keywordSection'),
   keywordInput: document.getElementById('keywordInput'),
@@ -8,13 +11,16 @@ const elements = {
 };
 
 // Initialize settings from storage
-chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'groupMode', 'keywords'], (settings) => {
+chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'groupMode', 'keywords'], (settings) => {
   elements.autoGroupToggle.checked = settings.autoGroup || false;
   elements.collapseToggle.checked = settings.collapseGroups ?? true;
+  elements.totalThreshold.value = settings.totalThreshold || 5;
+  elements.groupThreshold.value = settings.groupThreshold || 3;
   elements.groupMode.value = settings.groupMode || 'domain';
   elements.keywordInput.value = (settings.keywords || []).join(', ');
   
   toggleKeywordSection(elements.groupMode.value);
+  toggleThresholdSettings(elements.collapseToggle.checked);
 });
 
 // Event Listeners
@@ -23,7 +29,17 @@ elements.autoGroupToggle.addEventListener('change', () => {
 });
 
 elements.collapseToggle.addEventListener('change', () => {
-  chrome.storage.sync.set({ collapseGroups: elements.collapseToggle.checked });
+  const enabled = elements.collapseToggle.checked;
+  chrome.storage.sync.set({ collapseGroups: enabled });
+  toggleThresholdSettings(enabled);
+});
+
+elements.totalThreshold.addEventListener('change', () => {
+  chrome.storage.sync.set({ totalThreshold: parseInt(elements.totalThreshold.value) });
+});
+
+elements.groupThreshold.addEventListener('change', () => {
+  chrome.storage.sync.set({ groupThreshold: parseInt(elements.groupThreshold.value) });
 });
 
 elements.groupMode.addEventListener('change', () => {
@@ -59,5 +75,13 @@ function toggleKeywordSection(mode) {
     elements.keywordSection.classList.remove('hidden');
   } else {
     elements.keywordSection.classList.add('hidden');
+  }
+}
+
+function toggleThresholdSettings(enabled) {
+  if (enabled) {
+    elements.thresholdSettings.classList.remove('hidden');
+  } else {
+    elements.thresholdSettings.classList.add('hidden');
   }
 }

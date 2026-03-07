@@ -180,6 +180,36 @@ input[type="text"]:focus {
   border-color: var(--primary);
 }
 
+.threshold-inputs {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.input-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.input-row label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0;
+}
+
+input[type="number"] {
+  width: 50px;
+  padding: 4px 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+
 .hidden {
   display: none;
 }

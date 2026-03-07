@@ -19,6 +19,15 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
+// Listen for tab activation to handle auto-collapse focus switching
+chrome.tabs.onActivated.addListener(() => {
+  chrome.storage.sync.get(['autoGroup'], (settings) => {
+    if (settings.autoGroup) {
+      groupTabs();
+    }
+  });
+});
+
 // Listen for the keyboard command
 chrome.commands.onCommand.addListener((command) => {
   if (command === 'group-tabs') {

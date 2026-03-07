@@ -4,10 +4,20 @@ import Fuse from './lib/fuse.esm.js';
  * Groups tabs based on the current settings in storage.
  */
 export async function groupTabs(manualTrigger = false) {
-  const settings = await chrome.storage.sync.get(['groupMode', 'keywords', 'collapseGroups']);
+  const settings = await chrome.storage.sync.get([
+    'groupMode', 'keywords', 'collapseGroups', 'totalThreshold', 'groupThreshold'
+  ]);
   const allTabs = await chrome.tabs.query({ currentWindow: true, pinned: false });
   const existingGroups = await chrome.tabGroups.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
   const groupMap = new Map(existingGroups.map(g => [g.title, g.id]));
+
+  // Find active tab to know which group to keep expanded
+  const activeTab = allTabs.find(t => t.active);
+  const activeTabId = activeTab ? activeTab.id : null;
+  
+  const totalTabsCount = allTabs.length;
+  const totalThreshold = settings.totalThreshold || 5;
+  const groupThreshold = settings.groupThreshold || 3;
   
   // Setup Fuse if in keyword mode
   let fuse = null;
@@ -19,7 +29,6 @@ export async function groupTabs(manualTrigger = false) {
   }
 
   // 1. Identify which group each tab belongs to
-  // Separate "New Tab" pages to keep them at the end
   const tabGroupAssignments = [];
   const newTabs = [];
 
@@ -67,8 +76,29 @@ export async function groupTabs(manualTrigger = false) {
         color: getColorForKey(key)
       };
 
-      if (!existingGroupId || manualTrigger) {
-        updateProps.collapsed = settings.collapseGroups ?? true;
+      // Advanced Collapsing Logic
+      if (settings.collapseGroups) {
+        const containsActiveTab = tabsInGroup.includes(activeTabId);
+        const meetsTotalThreshold = totalTabsCount >= totalThreshold;
+        const meetsGroupThreshold = tabsInGroup.length >= groupThreshold;
+
+        if (containsActiveTab) {
+          // Never collapse the active group
+          updateProps.collapsed = false;
+        } else if (meetsTotalThreshold && meetsGroupThreshold) {
+          // Collapse if both thresholds are met
+          updateProps.collapsed = true;
+        } else {
+          // Expand if below thresholds
+          updateProps.collapsed = false;
+        }
+      } else {
+        // Option is disabled - use default behavior (manualTrigger forces collapse if wanted, otherwise expand)
+        if (manualTrigger) {
+          updateProps.collapsed = true;
+        } else if (!existingGroupId) {
+          updateProps.collapsed = false;
+        }
       }
 
       await chrome.tabGroups.update(groupId, updateProps);

@@ -30,13 +30,24 @@
 
       <section class="control-group">
         <div class="label-row">
-          <label for="collapseToggle">Collapse groups</label>
+          <label for="collapseToggle">Collapse groups (Folder Mode)</label>
           <label class="toggle-switch">
             <input type="checkbox" id="collapseToggle">
             <span class="slider"></span>
           </label>
         </div>
-        <p class="description">Keep groups collapsed like folders.</p>
+        <p class="description">Keep non-active groups collapsed.</p>
+        
+        <div id="thresholdSettings" class="threshold-inputs hidden">
+          <div class="input-row">
+            <label for="totalThreshold">Min total tabs to start</label>
+            <input type="number" id="totalThreshold" min="1" max="50">
+          </div>
+          <div class="input-row">
+            <label for="groupThreshold">Min tabs per group to collapse</label>
+            <input type="number" id="groupThreshold" min="1" max="50">
+          </div>
+        </div>
       </section>
 
       <section class="control-group">
