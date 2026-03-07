@@ -1,16 +1,60 @@
 import Fuse from './lib/fuse.esm.js';
 
+let cachedIsVivaldi = null;
+const isVivaldi = async () => {
+  if (cachedIsVivaldi !== null) return cachedIsVivaldi;
+  const tabs = await chrome.tabs.query({ windowType: 'normal' });
+  // Vivaldi-specific properties: vivExtData or splitViewId
+  cachedIsVivaldi = tabs.length > 0 && ('vivExtData' in tabs[0] || 'splitViewId' in tabs[0]);
+  return cachedIsVivaldi;
+};
+
 /**
  * Groups tabs based on the current settings in storage.
  */
 export async function groupTabs(manualTrigger = false, forcedActiveTabId = null, forceMode = null) {
+  const browserIsVivaldi = await isVivaldi();
   console.log(`[SmartTabManager] groupTabs triggered. Manual: ${manualTrigger}, ForcedTab: ${forcedActiveTabId}, ForceMode: ${forceMode}`);
 
   const settings = await chrome.storage.sync.get([
-    'groupMode', 'keywords', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'autoGroup', 'sortStrategy'
+    'groupMode', 'keywords', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'autoGroup', 'sortStrategy', 'vivaldiNativeStacking'
   ]);
   const allTabs = await chrome.tabs.query({ currentWindow: true, pinned: false });
   const existingGroups = await chrome.tabGroups.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+  
+  const vivaldiNative = settings.vivaldiNativeStacking ?? true;
+
+  console.log(`[SmartTabManager] Browser: ${browserIsVivaldi ? 'Vivaldi' : 'Chrome/Other'}`);
+  if (browserIsVivaldi && vivaldiNative) {
+    console.log(`[SmartTabManager] Vivaldi Native Stacking: Enabled`);
+  }
+  if (allTabs.length > 0) {
+    const sampleTab = allTabs[0];
+    console.log(`[SmartTabManager] Sample Tab Keys:`, Object.keys(sampleTab));
+    console.log(`[SmartTabManager] Sample Tab Metadata:`, JSON.stringify(sampleTab, (key, value) => {
+      if (key === 'vivExtData') return (value && value.length > 50) ? value.substring(0, 50) + '...' : value;
+      return value;
+    }, 2));
+    
+    // Log Vivaldi-specific fields specifically as they might be hidden from stringify
+    if (browserIsVivaldi) {
+      console.log(`[SmartTabManager] Vivaldi Global Object Check:`, typeof vivaldi);
+      console.log(`[SmartTabManager] Vivaldi Fields - splitViewId: ${sampleTab.splitViewId}, workspaceId: ${sampleTab.workspaceId}, extData: ${sampleTab.extData}`);
+      
+      // Try to see if any hidden properties exist by checking common Vivaldi names
+      const vivaldiKeys = ['vivExtData', 'extData', 'vivWorkspaceId', 'vivaldiGroup'];
+      vivaldiKeys.forEach(k => {
+        if (sampleTab[k]) console.log(`[SmartTabManager] Found hidden Vivaldi key "${k}":`, sampleTab[k]);
+      });
+      if (sampleTab.vivExtData) {
+        try {
+          console.log(`[SmartTabManager] Vivaldi Ext Data (Parsed):`, JSON.parse(sampleTab.vivExtData));
+        } catch (e) {
+          console.log(`[SmartTabManager] Vivaldi Ext Data (Raw):`, sampleTab.vivExtData);
+        }
+      }
+    }
+  }
   
   console.log(`[SmartTabManager] Settings:`, settings);
   console.log(`[SmartTabManager] Unpinned Tabs: ${allTabs.length}, Existing Groups: ${existingGroups.length}`);
@@ -123,24 +167,65 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
       try {
         let groupId = groupMap.get(key);
 
-        // ONLY MOVE & RE-GROUP IF:
         // ONLY RE-ORGANIZE IF:
         // 1. autoGroup is enabled
         // 2. OR it's a manual "Group Now" call and NOT a forceMode call
         // 3. OR the group doesn't exist yet
-        const shouldReorganize = (autoGroup || (manualTrigger && !forceMode)) || !groupId;
+        let shouldReorganize = (autoGroup || (manualTrigger && !forceMode)) || !groupId;
+
+        // VIVALDI OPTIMIZATION:
+        // If we are in Vivaldi, and the tabs are already in THIS group, avoid moving them 
+        // to prevent Vivaldi's tab stack logic from flickering or resetting.
+        if (browserIsVivaldi && groupId) {
+          const allAlreadyInGroup = tabsInGroup.every(tid => {
+            const assignment = tabGroupAssignments.find(a => a.tabId === tid);
+            return assignment && assignment.currentGroupId === groupId;
+          });
+          if (allAlreadyInGroup && !manualTrigger) {
+            console.log(`[SmartTabManager] Vivaldi: Tabs already in group "${key}", skipping move.`);
+            shouldReorganize = false;
+          }
+        }
 
         if (shouldReorganize) {
           for (const tabId of tabsInGroup) {
             await chrome.tabs.move(tabId, { index: currentIndex });
             currentIndex++;
+            
+            // VIVALDI NATIVE STACKING WORKAROUND
+            if (browserIsVivaldi && vivaldiNative) {
+              await new Promise(r => setTimeout(r, 20)); // Breathe
+              try {
+                const vivData = JSON.stringify({
+                  group: `smart-group-${key}`,
+                  fixedGroupTitle: key
+                });
+                await chrome.tabs.update(tabId, { vivExtData: vivData });
+              } catch (e) {}
+            }
           }
-          groupId = await chrome.tabs.group({ 
-            tabIds: tabsInGroup, 
-            groupId: groupId 
-          });
+
+          // ONLY CREATE GROUPS IF:
+          // 1. We are not in Vivaldi
+          // 2. OR we are in Vivaldi and Native Stacking is ENABLED
+          if (!browserIsVivaldi || (browserIsVivaldi && vivaldiNative)) {
+            groupId = await chrome.tabs.group({ 
+              tabIds: tabsInGroup, 
+              groupId: groupId 
+            });
+
+            if (browserIsVivaldi) {
+              // Forced sticking for Vivaldi
+              await chrome.tabGroups.update(groupId, { title: key, color: getColorForKey(key) });
+            }
+          } else {
+            // Un-group tabs if they were in a group before and we are turning stacking OFF
+            try {
+              await chrome.tabs.ungroup(tabsInGroup);
+            } catch (e) {}
+            groupId = undefined;
+          }
         } else {
-          // Just track position for next groups and use existing groupId
           currentIndex += tabsInGroup.length;
         }
 
@@ -171,11 +256,19 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
         }
 
         if (groupId) {
-          // console.log(`[SmartTabManager] Group "${key}" -> collapsed: ${updateProps.collapsed}`);
-          await chrome.tabGroups.update(groupId, updateProps);
+          try {
+            await chrome.tabGroups.update(groupId, updateProps);
+            console.log(`[SmartTabManager] Group "${key}" updated successfully.`);
+          } catch (updateError) {
+            console.warn(`[SmartTabManager] Failed to update group "${key}":`, updateError.message);
+            // Fallback: try setting only title if full update fails
+            if (browserIsVivaldi) {
+               await chrome.tabGroups.update(groupId, { title: key });
+            }
+          }
         }
       } catch (e) {
-        console.warn(`Could not update group "${key}":`, e.message);
+        console.warn(`Could not process group "${key}":`, e.message);
         continue; 
       }
     }
