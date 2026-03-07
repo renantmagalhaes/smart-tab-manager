@@ -1,5 +1,6 @@
 const elements = {
   autoGroupToggle: document.getElementById('autoGroupToggle'),
+  collapseToggle: document.getElementById('collapseToggle'),
   groupMode: document.getElementById('groupMode'),
   keywordSection: document.getElementById('keywordSection'),
   keywordInput: document.getElementById('keywordInput'),
@@ -7,8 +8,9 @@ const elements = {
 };
 
 // Initialize settings from storage
-chrome.storage.sync.get(['autoGroup', 'groupMode', 'keywords'], (settings) => {
+chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'groupMode', 'keywords'], (settings) => {
   elements.autoGroupToggle.checked = settings.autoGroup || false;
+  elements.collapseToggle.checked = settings.collapseGroups ?? true;
   elements.groupMode.value = settings.groupMode || 'domain';
   elements.keywordInput.value = (settings.keywords || []).join(', ');
   
@@ -18,6 +20,10 @@ chrome.storage.sync.get(['autoGroup', 'groupMode', 'keywords'], (settings) => {
 // Event Listeners
 elements.autoGroupToggle.addEventListener('change', () => {
   chrome.storage.sync.set({ autoGroup: elements.autoGroupToggle.checked });
+});
+
+elements.collapseToggle.addEventListener('change', () => {
+  chrome.storage.sync.set({ collapseGroups: elements.collapseToggle.checked });
 });
 
 elements.groupMode.addEventListener('change', () => {

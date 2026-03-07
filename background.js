@@ -22,14 +22,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // Listen for the keyboard command
 chrome.commands.onCommand.addListener((command) => {
   if (command === 'group-tabs') {
-    groupTabs();
+    groupTabs(true);
   }
 });
 
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'triggerGroup') {
-    groupTabs();
+    groupTabs(true);
     sendResponse({ status: 'started' });
   }
 });
