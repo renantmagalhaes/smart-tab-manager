@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Tab Manager</title>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Smart Tab Manager</h1>
+      <p class="subtitle">Organize your workspace instantly</p>
+    </header>
+
+    <main>
+      <section class="control-group">
+        <div class="label-row">
+          <label for="autoGroupToggle">Auto-group tabs</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="autoGroupToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <p class="description">Automatically group tabs as you open them.</p>
+      </section>
+
+      <section class="control-group">
+        <label for="groupMode">Grouping Mode</label>
+        <div class="select-wrapper">
+          <select id="groupMode">
+            <option value="domain">By Domain (Root)</option>
+            <option value="subdomain">By Subdomain</option>
+            <option value="keyword">By Keyword (Fuzzy)</option>
+          </select>
+        </div>
+      </section>
+
+      <section id="keywordSection" class="control-group hidden">
+        <label for="keywordInput">Keywords (Comma separated)</label>
+        <input type="text" id="keywordInput" placeholder="e.g. Work, Social, News">
+        <p class="description">Tabs matching these will be grouped together.</p>
+      </section>
+
+      <div class="actions">
+        <button id="groupNowBtn" class="premium-btn">Group Now</button>
+      </div>
+    </main>
+
+    <footer>
+      <p>Shortcut: <kbd>Ctrl+Shift+G</kbd></p>
+    </footer>
+  </div>
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

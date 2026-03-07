@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Smart Tab Manager",
+  "version": "1.0.0",
+  "description": "Automatically group your tabs by domain, subdomain, or keywords using fuzzy matching.",
+  "permissions": [
+    "tabs",
+    "tabGroups",
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "commands": {
+    "group-tabs": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+G",
+        "mac": "Command+Shift+G"
+      },
+      "description": "Group tabs now"
+    }
+  }
+}
