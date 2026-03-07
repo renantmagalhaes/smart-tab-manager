@@ -19,13 +19,13 @@
     <main>
       <section class="control-group">
         <div class="label-row">
-          <label for="autoGroupToggle">Auto-group tabs</label>
+          <label for="autoGroupToggle">Activate Smart Manager</label>
           <label class="toggle-switch">
             <input type="checkbox" id="autoGroupToggle">
             <span class="slider"></span>
           </label>
         </div>
-        <p class="description">Automatically group tabs as you open them.</p>
+        <p class="description">Automatically organize tabs as you browse.</p>
       </section>
 
       <section class="control-group">
@@ -51,7 +51,7 @@
       </section>
 
       <section class="control-group">
-        <label for="groupMode">Grouping Mode</label>
+        <label for="groupMode">Organization logic</label>
         <div class="select-wrapper">
           <select id="groupMode">
             <option value="domain">By Domain (Root)</option>
@@ -62,7 +62,7 @@
       </section>
 
       <section class="control-group">
-        <label for="sortStrategy">Group Ordering</label>
+        <label for="sortStrategy">Folder sorting</label>
         <div class="select-wrapper">
           <select id="sortStrategy">
             <option value="alphabetical">Fixed (Alphabetical)</option>
@@ -70,11 +70,11 @@
             <option value="activeFirst">Dynamic (Active first)</option>
           </select>
         </div>
-        <p class="description">How folders are ordered in the tab bar.</p>
+        <p class="description">Determine the order of folders in your tab bar.</p>
       </section>
 
       <section id="keywordSection" class="control-group hidden">
-        <label for="keywordInput">Keywords (Comma separated)</label>
+        <label for="keywordInput">Custom labels (Comma separated)</label>
         <input type="text" id="keywordInput" placeholder="e.g. Work, Social, News">
         <p class="description">Tabs matching these will be grouped together.</p>
       </section>
@@ -84,7 +84,7 @@
           <button id="closeAllBtn" class="secondary-btn">Close All</button>
           <button id="openAllBtn" class="secondary-btn">Open All</button>
         </div> -->
-        <button id="groupNowBtn" class="premium-btn">Group Now</button>
+        <button id="groupNowBtn" class="premium-btn">Organize Now</button>
       </div>
 
       <div class="extra-options">
@@ -95,7 +95,7 @@
         <div id="extraOptionsContent" class="extra-options-content hidden">
           <div class="control-group no-bg">
             <div class="label-row">
-              <label for="vivaldiStackingToggle">Native Stacking (Vivaldi)</label>
+              <label for="vivaldiStackingToggle">Experimental: Vivaldi Stacking</label>
               <label class="toggle-switch">
                 <input type="checkbox" id="vivaldiStackingToggle">
                 <span class="slider"></span>
