@@ -66,12 +66,15 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
     let groupKey = 'Other';
 
     if (settings.groupMode === 'domain') {
-      groupKey = getRootDomain(url.hostname);
+      groupKey = getRootDomain(url.hostname) || 'Other';
     } else if (settings.groupMode === 'subdomain') {
-      groupKey = url.hostname;
+      groupKey = url.hostname || 'Other';
     } else if (settings.groupMode === 'keyword') {
-      groupKey = findFuzzyMatch(tab, fuse);
+      groupKey = findFuzzyMatch(tab, fuse) || 'Other';
     }
+    
+    // Ensure key is never just whitespace
+    if (!groupKey.trim()) groupKey = 'Other';
     
     tabGroupAssignments.push({ tabId: tab.id, groupKey, currentGroupId: tab.groupId });
   }
@@ -190,6 +193,7 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
 }
 
 function getRootDomain(hostname) {
+  if (!hostname) return 'Other';
   const parts = hostname.split('.');
   if (parts.length < 2) return hostname;
   
@@ -201,16 +205,15 @@ function getRootDomain(hostname) {
   
   // Case 1: Complex regional TLDs (e.g., brand.com.br, brand.co.uk)
   if (commonTLDs.includes(secondToLast) && commonTLDs.includes(lastPart) && parts.length >= 3) {
-    return parts[parts.length - 3];
+    return parts[parts.length - 3] || secondToLast;
   }
   
   // Case 2: Common single-part TLDs (e.g., google.com, reddit.org)
   if (commonTLDs.includes(lastPart)) {
-    return secondToLast;
+    return secondToLast || lastPart;
   }
   
   // Case 3: Specialized or uncommon TLDs (e.g., insecure.codes)
-  // User wants to keep the full domain here
   return parts.slice(-2).join('.');
 }
 
