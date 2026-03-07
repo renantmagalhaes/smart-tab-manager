@@ -30,21 +30,21 @@
 
       <section class="control-group">
         <div class="label-row">
-          <label for="collapseToggle">Collapse groups (Folder Mode)</label>
+          <label for="collapseToggle">Enable Folder Tidy Mode</label>
           <label class="toggle-switch">
             <input type="checkbox" id="collapseToggle">
             <span class="slider"></span>
           </label>
         </div>
-        <p class="description">Keep non-active groups collapsed.</p>
+        <p class="description">Automatically collapse folders you aren't using to keep your tab bar clean.</p>
         
         <div id="thresholdSettings" class="threshold-inputs hidden">
           <div class="input-row">
-            <label for="totalThreshold">Min total tabs to start</label>
+            <label for="totalThreshold">Minimum tabs for Tidy Mode</label>
             <input type="number" id="totalThreshold" min="1" max="50">
           </div>
           <div class="input-row">
-            <label for="groupThreshold">Min tabs per group to collapse</label>
+            <label for="groupThreshold">Minimum folder size to collapse</label>
             <input type="number" id="groupThreshold" min="1" max="50">
           </div>
         </div>
