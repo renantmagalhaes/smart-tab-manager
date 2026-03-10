@@ -319,6 +319,13 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
 
 function getRootDomain(hostname) {
   if (!hostname) return 'Other';
+  
+  // Handle IP addresses (e.g., 127.0.0.1, 192.168.1.1)
+  const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+  if (ipRegex.test(hostname) || hostname === 'localhost') {
+    return hostname;
+  }
+
   const parts = hostname.split('.');
   if (parts.length < 2) return hostname;
   
