@@ -120,7 +120,13 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
     // Ensure key is never just whitespace
     if (!groupKey.trim()) groupKey = 'Other';
     
-    tabGroupAssignments.push({ tabId: tab.id, groupKey, currentGroupId: tab.groupId });
+    tabGroupAssignments.push({ 
+      tabId: tab.id, 
+      groupKey, 
+      currentGroupId: tab.groupId,
+      hostname: url.hostname,
+      url: tab.url
+    });
   }
 
   // 2. Sort groups and tabs to bring them together
@@ -161,7 +167,26 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
   
   let currentIndex = 0;
   for (const key of groupedKeys) {
-    const tabsInGroup = tabGroupAssignments.filter(a => a.groupKey === key).map(a => a.tabId);
+    const groupAssignments = tabGroupAssignments.filter(a => a.groupKey === key);
+    
+    // Sort within group if strategy is alphabetical (or by default for better organization)
+    if (strategy === 'alphabetical' || strategy === 'activeFirst') {
+      groupAssignments.sort((a, b) => {
+        const hostA = a.hostname || '';
+        const hostB = b.hostname || '';
+        const comp = hostA.localeCompare(hostB);
+        if (comp !== 0) return comp;
+        return (a.url || '').localeCompare(b.url || '');
+      });
+    }
+    
+    const tabsInGroup = groupAssignments.map(a => a.tabId);
+    
+    console.log(`[SmartTabManager] Processing Group "${key}":`, {
+      originalOrder: tabGroupAssignments.filter(a => a.groupKey === key).map(a => a.hostname),
+      sortedOrder: groupAssignments.map(a => a.hostname),
+      tabsInGroup
+    });
     
     if (tabsInGroup.length > 0) {
       try {
@@ -188,13 +213,20 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
         }
 
         if (shouldReorganize) {
+          console.log(`[SmartTabManager] Reorganizing group "${key}" at index ${currentIndex}`);
+          
           for (const tabId of tabsInGroup) {
-            await chrome.tabs.move(tabId, { index: currentIndex });
-            currentIndex++;
+            try {
+              await chrome.tabs.move(tabId, { index: currentIndex });
+              currentIndex++;
+            } catch (moveError) {
+              console.warn(`[SmartTabManager] Failed to move tab ${tabId}: ${moveError.message}`);
+              // Continue anyway
+            }
             
             // VIVALDI NATIVE STACKING WORKAROUND
             if (browserIsVivaldi && vivaldiNative) {
-              await new Promise(r => setTimeout(r, 20)); // Breathe
+              await new Promise(r => setTimeout(r, 10)); // Breathe
               try {
                 const vivData = JSON.stringify({
                   group: `smart-group-${key}`,
