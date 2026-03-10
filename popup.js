@@ -19,13 +19,13 @@ const elements = {
 // Initialize settings from storage
 chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'groupMode', 'sortStrategy', 'keywords', 'vivaldiNativeStacking'], (settings) => {
   elements.autoGroupToggle.checked = settings.autoGroup || false;
-  elements.collapseToggle.checked = settings.collapseGroups ?? true;
+  elements.collapseToggle.checked = settings.collapseGroups ?? false;
   elements.totalThreshold.value = settings.totalThreshold || 5;
   elements.groupThreshold.value = settings.groupThreshold || 3;
   elements.groupMode.value = settings.groupMode || 'domain';
   elements.sortStrategy.value = settings.sortStrategy || 'alphabetical';
   elements.keywordInput.value = (settings.keywords || []).join(', ');
-  elements.vivaldiStackingToggle.checked = settings.vivaldiNativeStacking ?? true;
+  elements.vivaldiStackingToggle.checked = settings.vivaldiNativeStacking ?? false;
   
   toggleKeywordSection(elements.groupMode.value);
   toggleThresholdSettings(elements.collapseToggle.checked);

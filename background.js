@@ -3,6 +3,8 @@ import { groupTabs } from './grouping.js';
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.sync.set({
     autoGroup: false,
+    collapseGroups: false,
+    vivaldiNativeStacking: false,
     groupMode: 'domain', // 'domain', 'subdomain', 'keyword'
     keywords: []
   });
