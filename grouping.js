@@ -17,7 +17,7 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
   console.log(`[SmartTabManager] groupTabs triggered. Manual: ${manualTrigger}, ForcedTab: ${forcedActiveTabId}, ForceMode: ${forceMode}`);
 
   const settings = await chrome.storage.sync.get([
-    'groupMode', 'keywords', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'autoGroup', 'sortStrategy', 'vivaldiNativeStacking', 'vivaldiApplyMetadata'
+    'groupMode', 'keywords', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'autoGroup', 'sortStrategy', 'vivaldiNativeStacking', 'vivaldiApplyNames', 'vivaldiApplyColors'
   ]);
   const allTabs = await chrome.tabs.query({ currentWindow: true, pinned: false });
   const existingGroups = await chrome.tabGroups.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
@@ -36,21 +36,7 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
       return value;
     }, 2));
     
-    // Log Vivaldi-specific fields specifically as they might be hidden from stringify
-    if (browserIsVivaldi) {
-      console.log(`[SmartTabManager] --- DETAILED VIVALDI METADATA DUMP ---`);
-      allTabs.forEach(t => {
-        if (t.vivExtData) {
-          try {
-            const parsed = JSON.parse(t.vivExtData);
-            console.log(`[SmartTabManager] Tab ${t.id} ("${t.title.substring(0, 20)}..."):`, parsed);
-          } catch (e) {
-            console.log(`[SmartTabManager] Tab ${t.id} RAW:`, t.vivExtData);
-          }
-        }
-      });
-      console.log(`[SmartTabManager] --- END DUMP ---`);
-    }
+    // Vivaldi-specific fields logging removed for production
   }
   
   console.log(`[SmartTabManager] Settings:`, settings);
@@ -233,20 +219,27 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
               groupId: groupId 
             });
 
-            // Vivaldi-specific: Apply metadata AFTER grouping
-            if (browserIsVivaldi && (settings.vivaldiApplyMetadata ?? false)) {
-              console.log(`[SmartTabManager] Applying post-grouping metadata for Vivaldi group "${key}"`);
+            // Vivaldi-specific: Apply metadata AFTER grouping for reliability
+            if (browserIsVivaldi && vivaldiNative) {
+              console.log(`[SmartTabManager] Applying stacking metadata for Vivaldi group "${key}"`);
               const colorResult = getColorForKey(key);
               
               const vivDataObj = {
-                group: `smart-group-${key}`,
-                fixedGroupTitle: key,
-                // Brute-forcing potential keys based on Vivaldi findings
-                color: colorResult.vivaldiIndex,           // Integer 1-9
-                groupColor: colorResult.vivaldiId,         // 'color1', 'color2', etc.
-                accentColor: colorResult.hex,              // Hex code
-                colorID: colorResult.vivaldiIndex          // Another potential key
+                group: `smart-group-${key}`
               };
+
+              // Conditionally apply names
+              if (settings.vivaldiApplyNames) {
+                vivDataObj.fixedGroupTitle = key;
+              }
+
+              // Conditionally apply colors
+              if (settings.vivaldiApplyColors) {
+                vivDataObj.color = colorResult.vivaldiIndex;
+                vivDataObj.groupColor = colorResult.vivaldiId;
+                vivDataObj.accentColor = colorResult.hex;
+                vivDataObj.colorID = colorResult.vivaldiIndex;
+              }
 
               for (const tabId of tabsInGroup) {
                 try {
@@ -254,8 +247,16 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
                 } catch (e) {}
               }
 
-              // Forced sticking for Vivaldi labels
-              await chrome.tabGroups.update(groupId, { title: key, color: colorResult.name });
+              // Apply standard label/color to the tab group as well (works for some Vivaldi versions/UI modes)
+              if (settings.vivaldiApplyNames || settings.vivaldiApplyColors) {
+                const groupUpdateProps = {};
+                if (settings.vivaldiApplyNames) groupUpdateProps.title = key;
+                if (settings.vivaldiApplyColors) groupUpdateProps.color = colorResult.name;
+                
+                try {
+                  await chrome.tabGroups.update(groupId, groupUpdateProps);
+                } catch (e) {}
+              }
             }
           } else {
             // Un-group tabs if they were in a group before and we are turning stacking OFF
