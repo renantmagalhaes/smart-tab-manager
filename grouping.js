@@ -38,21 +38,18 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
     
     // Log Vivaldi-specific fields specifically as they might be hidden from stringify
     if (browserIsVivaldi) {
-      console.log(`[SmartTabManager] Vivaldi Global Object Check:`, typeof vivaldi);
-      console.log(`[SmartTabManager] Vivaldi Fields - splitViewId: ${sampleTab.splitViewId}, workspaceId: ${sampleTab.workspaceId}, extData: ${sampleTab.extData}`);
-      
-      // Try to see if any hidden properties exist by checking common Vivaldi names
-      const vivaldiKeys = ['vivExtData', 'extData', 'vivWorkspaceId', 'vivaldiGroup'];
-      vivaldiKeys.forEach(k => {
-        if (sampleTab[k]) console.log(`[SmartTabManager] Found hidden Vivaldi key "${k}":`, sampleTab[k]);
-      });
-      if (sampleTab.vivExtData) {
-        try {
-          console.log(`[SmartTabManager] Vivaldi Ext Data (Parsed):`, JSON.parse(sampleTab.vivExtData));
-        } catch (e) {
-          console.log(`[SmartTabManager] Vivaldi Ext Data (Raw):`, sampleTab.vivExtData);
+      console.log(`[SmartTabManager] --- DETAILED VIVALDI METADATA DUMP ---`);
+      allTabs.forEach(t => {
+        if (t.vivExtData) {
+          try {
+            const parsed = JSON.parse(t.vivExtData);
+            console.log(`[SmartTabManager] Tab ${t.id} ("${t.title.substring(0, 20)}..."):`, parsed);
+          } catch (e) {
+            console.log(`[SmartTabManager] Tab ${t.id} RAW:`, t.vivExtData);
+          }
         }
-      }
+      });
+      console.log(`[SmartTabManager] --- END DUMP ---`);
     }
   }
   
@@ -224,23 +221,7 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
               // Continue anyway
             }
             
-            // VIVALDI NATIVE STACKING WORKAROUND
-            if (browserIsVivaldi && vivaldiNative) {
-              await new Promise(r => setTimeout(r, 10)); // Breathe
-              try {
-                const vivMetadataEnabled = settings.vivaldiApplyMetadata ?? false;
-                const vivDataObj = {
-                  group: `smart-group-${key}`
-                };
-                
-                if (vivMetadataEnabled) {
-                  vivDataObj.fixedGroupTitle = key;
-                  vivDataObj.color = getColorForKey(key);
-                }
-                
-                await chrome.tabs.update(tabId, { vivExtData: JSON.stringify(vivDataObj) });
-              } catch (e) {}
-            }
+            // Metadata application moved to after the group call for reliability
           }
 
           // ONLY CREATE GROUPS IF:
@@ -252,9 +233,29 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
               groupId: groupId 
             });
 
+            // Vivaldi-specific: Apply metadata AFTER grouping
             if (browserIsVivaldi && (settings.vivaldiApplyMetadata ?? false)) {
-              // Forced sticking for Vivaldi
-              await chrome.tabGroups.update(groupId, { title: key, color: getColorForKey(key) });
+              console.log(`[SmartTabManager] Applying post-grouping metadata for Vivaldi group "${key}"`);
+              const colorResult = getColorForKey(key);
+              
+              const vivDataObj = {
+                group: `smart-group-${key}`,
+                fixedGroupTitle: key,
+                // Brute-forcing potential keys based on Vivaldi findings
+                color: colorResult.vivaldiIndex,           // Integer 1-9
+                groupColor: colorResult.vivaldiId,         // 'color1', 'color2', etc.
+                accentColor: colorResult.hex,              // Hex code
+                colorID: colorResult.vivaldiIndex          // Another potential key
+              };
+
+              for (const tabId of tabsInGroup) {
+                try {
+                  await chrome.tabs.update(tabId, { vivExtData: JSON.stringify(vivDataObj) });
+                } catch (e) {}
+              }
+
+              // Forced sticking for Vivaldi labels
+              await chrome.tabGroups.update(groupId, { title: key, color: colorResult.name });
             }
           } else {
             // Un-group tabs if they were in a group before and we are turning stacking OFF
@@ -267,9 +268,10 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
           currentIndex += tabsInGroup.length;
         }
 
+        const colorResult = getColorForKey(key);
         const updateProps = { 
           title: key,
-          color: getColorForKey(key)
+          color: colorResult.name
         };
 
         // Advanced Collapsing Logic
@@ -365,10 +367,20 @@ function findFuzzyMatch(tab, fuse) {
 }
 
 function getColorForKey(key) {
-  const colors = ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'];
+  const colorMap = [
+    { name: 'grey', hex: '#5F6368', vivaldiId: 'color1', vivaldiIndex: 1 },
+    { name: 'blue', hex: '#1A73E8', vivaldiId: 'color2', vivaldiIndex: 2 },
+    { name: 'red', hex: '#D93025', vivaldiId: 'color3', vivaldiIndex: 3 },
+    { name: 'yellow', hex: '#F9AB00', vivaldiId: 'color4', vivaldiIndex: 4 },
+    { name: 'green', hex: '#1E8E3E', vivaldiId: 'color5', vivaldiIndex: 5 },
+    { name: 'pink', hex: '#D01884', vivaldiId: 'color6', vivaldiIndex: 6 },
+    { name: 'purple', hex: '#9334E6', vivaldiId: 'color7', vivaldiIndex: 7 },
+    { name: 'cyan', hex: '#12B5CB', vivaldiId: 'color8', vivaldiIndex: 8 },
+    { name: 'orange', hex: '#E8710A', vivaldiId: 'color9', vivaldiIndex: 9 }
+  ];
   let hash = 0;
   for (let i = 0; i < key.length; i++) {
     hash = key.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return colors[Math.abs(hash) % colors.length];
+  return colorMap[Math.abs(hash) % colorMap.length];
 }
