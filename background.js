@@ -5,6 +5,7 @@ chrome.runtime.onInstalled.addListener(() => {
     autoGroup: false,
     collapseGroups: false,
     vivaldiNativeStacking: false,
+    vivaldiApplyMetadata: false,
     groupMode: 'domain', // 'domain', 'subdomain', 'keyword'
     keywords: []
   });

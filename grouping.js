@@ -17,7 +17,7 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
   console.log(`[SmartTabManager] groupTabs triggered. Manual: ${manualTrigger}, ForcedTab: ${forcedActiveTabId}, ForceMode: ${forceMode}`);
 
   const settings = await chrome.storage.sync.get([
-    'groupMode', 'keywords', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'autoGroup', 'sortStrategy', 'vivaldiNativeStacking'
+    'groupMode', 'keywords', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'autoGroup', 'sortStrategy', 'vivaldiNativeStacking', 'vivaldiApplyMetadata'
   ]);
   const allTabs = await chrome.tabs.query({ currentWindow: true, pinned: false });
   const existingGroups = await chrome.tabGroups.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
@@ -228,11 +228,17 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
             if (browserIsVivaldi && vivaldiNative) {
               await new Promise(r => setTimeout(r, 10)); // Breathe
               try {
-                const vivData = JSON.stringify({
-                  group: `smart-group-${key}`,
-                  fixedGroupTitle: key
-                });
-                await chrome.tabs.update(tabId, { vivExtData: vivData });
+                const vivMetadataEnabled = settings.vivaldiApplyMetadata ?? false;
+                const vivDataObj = {
+                  group: `smart-group-${key}`
+                };
+                
+                if (vivMetadataEnabled) {
+                  vivDataObj.fixedGroupTitle = key;
+                  vivDataObj.color = getColorForKey(key);
+                }
+                
+                await chrome.tabs.update(tabId, { vivExtData: JSON.stringify(vivDataObj) });
               } catch (e) {}
             }
           }
@@ -246,7 +252,7 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
               groupId: groupId 
             });
 
-            if (browserIsVivaldi) {
+            if (browserIsVivaldi && (settings.vivaldiApplyMetadata ?? false)) {
               // Forced sticking for Vivaldi
               await chrome.tabGroups.update(groupId, { title: key, color: getColorForKey(key) });
             }

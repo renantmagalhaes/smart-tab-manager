@@ -10,6 +10,7 @@ const elements = {
   keywordInput: document.getElementById('keywordInput'),
   groupNowBtn: document.getElementById('groupNowBtn'),
   vivaldiStackingToggle: document.getElementById('vivaldiStackingToggle'),
+  vivaldiMetadataToggle: document.getElementById('vivaldiMetadataToggle'),
   extraOptionsHeader: document.getElementById('extraOptionsHeader'),
   extraOptionsContent: document.getElementById('extraOptionsContent'),
   // closeAllBtn: document.getElementById('closeAllBtn'),
@@ -17,7 +18,7 @@ const elements = {
 };
 
 // Initialize settings from storage
-chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'groupMode', 'sortStrategy', 'keywords', 'vivaldiNativeStacking'], (settings) => {
+chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'groupMode', 'sortStrategy', 'keywords', 'vivaldiNativeStacking', 'vivaldiApplyMetadata'], (settings) => {
   elements.autoGroupToggle.checked = settings.autoGroup || false;
   elements.collapseToggle.checked = settings.collapseGroups ?? false;
   elements.totalThreshold.value = settings.totalThreshold || 5;
@@ -26,6 +27,7 @@ chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'group
   elements.sortStrategy.value = settings.sortStrategy || 'alphabetical';
   elements.keywordInput.value = (settings.keywords || []).join(', ');
   elements.vivaldiStackingToggle.checked = settings.vivaldiNativeStacking ?? false;
+  elements.vivaldiMetadataToggle.checked = settings.vivaldiApplyMetadata ?? false;
   
   toggleKeywordSection(elements.groupMode.value);
   toggleThresholdSettings(elements.collapseToggle.checked);
@@ -74,6 +76,10 @@ elements.keywordInput.addEventListener('input', () => {
 
 elements.vivaldiStackingToggle.addEventListener('change', () => {
   chrome.storage.sync.set({ vivaldiNativeStacking: elements.vivaldiStackingToggle.checked });
+});
+
+elements.vivaldiMetadataToggle.addEventListener('change', () => {
+  chrome.storage.sync.set({ vivaldiApplyMetadata: elements.vivaldiMetadataToggle.checked });
 });
 
 /* 
