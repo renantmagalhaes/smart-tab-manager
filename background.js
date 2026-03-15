@@ -1,14 +1,31 @@
 import { groupTabs } from './grouping.js';
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.sync.set({
-    autoGroup: false,
-    collapseGroups: false,
-    vivaldiNativeStacking: false,
-    vivaldiApplyNames: false,
-    vivaldiApplyColors: false,
-    groupMode: 'domain', // 'domain', 'subdomain', 'keyword'
-    keywords: []
+chrome.runtime.onInstalled.addListener((details) => {
+  chrome.storage.sync.get(null, (currentSettings) => {
+    const defaultSettings = {
+      autoGroup: false,
+      collapseGroups: false,
+      vivaldiNativeStacking: false,
+      vivaldiApplyNames: false,
+      vivaldiApplyColors: false,
+      groupMode: 'domain', // 'domain', 'subdomain', 'keyword'
+      keywords: [],
+      totalThreshold: 5,
+      groupThreshold: 3,
+      sortStrategy: 'alphabetical'
+    };
+    
+    // Only set defaults for keys that don't exist yet
+    const settingsToSet = {};
+    for (const key in defaultSettings) {
+      if (currentSettings[key] === undefined) {
+        settingsToSet[key] = defaultSettings[key];
+      }
+    }
+    
+    if (Object.keys(settingsToSet).length > 0) {
+      chrome.storage.sync.set(settingsToSet);
+    }
   });
 });
 
@@ -20,6 +37,15 @@ function debouncedGroupTabs(manual = false, forcedTabId = null, forceMode = null
     groupTabs(manual, forcedTabId, forceMode);
   }, 150);
 }
+
+// Listen for browser startup
+chrome.runtime.onStartup.addListener(() => {
+  chrome.storage.sync.get(['autoGroup', 'collapseGroups'], (settings) => {
+    if (settings.autoGroup || settings.collapseGroups) {
+      debouncedGroupTabs();
+    }
+  });
+});
 
 // Listen for tab updates
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
