@@ -1,4 +1,4 @@
-import Fuse from './lib/fuse.esm.js';
+import Fuse from '../shared/vendor/fuse.esm.js';
 
 let cachedIsVivaldi = null;
 const isVivaldi = async () => {
