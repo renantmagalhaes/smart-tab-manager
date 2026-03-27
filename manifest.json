@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Smart Tab Manager",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Automatically group your tabs by domain, subdomain, or keywords using fuzzy matching.",
   "permissions": [
     "tabs",
