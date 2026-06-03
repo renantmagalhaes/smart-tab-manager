@@ -14,6 +14,6 @@ This extension does **not** collect any personal information, browsing data, or 
 
 ## Contact
 
-If you have any questions about this privacy policy, feel free to contact the developer at: [rtm@insecure.codes] or via [GitHub](https://github.com/renantmagalhaes).
+If you have any questions about this privacy policy, feel free to contact the developer at: [renan@seclabs.cc] or via [GitHub](https://github.com/renantmagalhaes).
 
 By using this extension, you agree to this policy.
