@@ -5,10 +5,10 @@ chrome.runtime.onInstalled.addListener((details) => {
     const defaultSettings = {
       autoGroup: false,
       collapseGroups: false,
-      vivaldiNativeStacking: false,
-      vivaldiApplyNames: false,
-      vivaldiApplyColors: false,
-      groupMode: 'domain', // 'domain', 'subdomain', 'keyword'
+      vivaldiNativeStacking: true, // Arrange in folders/stacks
+      vivaldiApplyNames: true,     // Name folders/stacks
+      vivaldiApplyColors: true,    // Colorize folders/stacks
+      groupMode: 'domain',         // 'domain', 'subdomain', 'keyword'
       keywords: [],
       totalThreshold: 5,
       groupThreshold: 3,
@@ -47,9 +47,9 @@ chrome.runtime.onStartup.addListener(() => {
   });
 });
 
-// Listen for tab updates
+// Listen for tab updates (URL change or page load completion)
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'loading' || changeInfo.url) {
+  if (changeInfo.status === 'complete' || changeInfo.url) {
     chrome.storage.sync.get(['autoGroup', 'collapseGroups'], (settings) => {
       if (settings.autoGroup || settings.collapseGroups) {
         debouncedGroupTabs();
@@ -76,7 +76,7 @@ chrome.tabs.onRemoved.addListener(() => {
   });
 });
 
-// Listen for tab activation
+// Listen for tab activation (switching active tab updates Tidy Mode collapsing)
 chrome.tabs.onActivated.addListener((activeInfo) => {
   chrome.storage.sync.get(['autoGroup', 'collapseGroups'], (settings) => {
     if (settings.autoGroup || settings.collapseGroups) {
@@ -84,6 +84,15 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
     }
   });
 });
+
+// Listen for keyboard commands (e.g. Ctrl+Shift+G)
+if (chrome.commands && chrome.commands.onCommand) {
+  chrome.commands.onCommand.addListener((command) => {
+    if (command === 'group-tabs') {
+      debouncedGroupTabs(true);
+    }
+  });
+}
 
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

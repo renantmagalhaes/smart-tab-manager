@@ -27,9 +27,9 @@ chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'group
   elements.groupMode.value = settings.groupMode || 'domain';
   elements.sortStrategy.value = settings.sortStrategy || 'alphabetical';
   elements.keywordInput.value = (settings.keywords || []).join(', ');
-  elements.vivaldiStackingToggle.checked = settings.vivaldiNativeStacking ?? false;
-  elements.vivaldiNamesToggle.checked = settings.vivaldiApplyNames ?? false;
-  elements.vivaldiColorsToggle.checked = settings.vivaldiApplyColors ?? false;
+  elements.vivaldiStackingToggle.checked = settings.vivaldiNativeStacking ?? true;
+  elements.vivaldiNamesToggle.checked = settings.vivaldiApplyNames ?? true;
+  elements.vivaldiColorsToggle.checked = settings.vivaldiApplyColors ?? true;
   
   toggleKeywordSection(elements.groupMode.value);
   toggleThresholdSettings(elements.collapseToggle.checked);
