@@ -1,21 +1,9 @@
 import Fuse from '../shared/vendor/fuse.esm.js';
 
-let cachedIsVivaldi = null;
-const isVivaldi = async () => {
-  if (cachedIsVivaldi !== null) return cachedIsVivaldi;
-  try {
-    const tabs = await chrome.tabs.query({ windowType: 'normal' });
-    cachedIsVivaldi = tabs.length > 0 && ('vivExtData' in tabs[0] || 'splitViewId' in tabs[0]);
-  } catch (e) {
-    cachedIsVivaldi = false;
-  }
-  return cachedIsVivaldi;
-};
-
 /**
  * Checks if a URL is an internal or special browser page that should not be grouped.
  */
-function isInternalUrl(url) {
+export function isInternalUrl(url) {
   if (!url) return true;
   return (
     url.startsWith('chrome://') ||
@@ -30,18 +18,28 @@ function isInternalUrl(url) {
 
 /**
  * Groups tabs based on the current settings in storage.
- * Supports both Chromium Tab Groups API (VB-131507) and Vivaldi vivExtData Tab Stacking.
+ * Uses standard Chromium Tab Groups and Tabs APIs.
  */
 export async function groupTabs(manualTrigger = false, forcedActiveTabId = null, forceMode = null) {
   try {
-    const browserIsVivaldi = await isVivaldi();
-    console.log(`[SmartTabManager] groupTabs triggered. Manual: ${manualTrigger}, ForcedTab: ${forcedActiveTabId}, ForceMode: ${forceMode}, Browser: ${browserIsVivaldi ? 'Vivaldi' : 'Chromium'}`);
+    console.log(`[SmartTabManager] groupTabs triggered. Manual: ${manualTrigger}, ForcedTab: ${forcedActiveTabId}, ForceMode: ${forceMode}`);
 
     const settings = await chrome.storage.sync.get([
       'groupMode', 'keywords', 'collapseGroups', 'totalThreshold', 'groupThreshold',
-      'autoGroup', 'sortStrategy', 'vivaldiNativeStacking', 'vivaldiApplyNames', 'vivaldiApplyColors'
+      'autoGroup', 'sortStrategy', 'arrangeInFolders', 'applyFolderNames', 'applyFolderColors',
+      'vivaldiNativeStacking', 'vivaldiApplyNames', 'vivaldiApplyColors'
     ]);
     console.log('[SmartTabManager] Current Settings:', settings);
+
+    const autoGroup = settings.autoGroup ?? false;
+    const createTabGroups = (settings.arrangeInFolders ?? settings.vivaldiNativeStacking) !== false;
+    const applyNames = (settings.applyFolderNames ?? settings.vivaldiApplyNames) !== false;
+    const applyColors = (settings.applyFolderColors ?? settings.vivaldiApplyColors) !== false;
+    const totalThreshold = Number(settings.totalThreshold ?? 5);
+    const groupThreshold = Number(settings.groupThreshold ?? 3);
+    const strategy = settings.sortStrategy || 'alphabetical';
+
+    const canMoveTabs = autoGroup || (manualTrigger && !forceMode);
 
     // 1. Retrieve tabs from the active window with fallbacks
     let allTabs = [];
@@ -71,19 +69,12 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
       }
     }
 
-    console.log(`[SmartTabManager] Unpinned Tabs found: ${allTabs?.length || 0}`);
     if (!allTabs || allTabs.length === 0) {
-      console.warn('[SmartTabManager] No tabs found to organize in target window.');
+      console.log('[SmartTabManager] No unpinned tabs found to organize.');
       return;
     }
 
     const targetWindowId = allTabs[0].windowId;
-    console.log(`[SmartTabManager] Target Window ID: ${targetWindowId}`);
-
-    if (allTabs.length > 0 && browserIsVivaldi) {
-      console.log(`[SmartTabManager] Sample Tab vivExtData:`, allTabs[0].vivExtData);
-    }
-
     let pinnedTabs = [];
     try {
       pinnedTabs = await chrome.tabs.query({ windowId: targetWindowId, pinned: true });
@@ -91,43 +82,44 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
       console.warn('[SmartTabManager] Failed to query pinned tabs:', e.message);
     }
 
+    const totalTabsCount = allTabs.length + pinnedTabs.length;
+
     // 2. Check Tab Groups API availability
     const hasTabsGroupApi = typeof chrome.tabs?.group === 'function';
     const hasTabGroupsApi = !!chrome.tabGroups;
-    console.log('[SmartTabManager] Tab Group API Support:', {
-      hasTabsGroupApi,
-      hasTabGroupsApi,
-      tabGroupsObject: chrome.tabGroups ? Object.keys(chrome.tabGroups) : null
-    });
+
+    // If folders are disabled, ensure all tabs in this window are ungrouped once
+    if (!createTabGroups) {
+      const tabsToUngroup = allTabs
+        .filter(t => t.groupId && t.groupId !== -1 && t.groupId !== chrome.tabGroups?.TAB_GROUP_ID_NONE)
+        .map(t => t.id);
+
+      if (tabsToUngroup.length > 0 && hasTabsGroupApi) {
+        try {
+          await chrome.tabs.ungroup(tabsToUngroup);
+          console.log(`[SmartTabManager] Ungrouped ${tabsToUngroup.length} tabs because folder mode is disabled.`);
+        } catch (e) {
+          console.warn('[SmartTabManager] Could not ungroup tabs:', e.message);
+        }
+      }
+    }
+
+    // Check if any further action is required
+    const needsTidyCheck = createTabGroups && settings.collapseGroups;
+    if (!canMoveTabs && !forceMode && !needsTidyCheck) {
+      console.log('[SmartTabManager] No action required based on current settings and trigger.');
+      return;
+    }
 
     let existingGroups = [];
-    if (hasTabGroupsApi && typeof chrome.tabGroups.query === 'function') {
+    if (createTabGroups && hasTabGroupsApi && typeof chrome.tabGroups.query === 'function') {
       try {
         existingGroups = await chrome.tabGroups.query({ windowId: targetWindowId });
-        console.log(`[SmartTabManager] Existing tab groups count: ${existingGroups.length}`);
       } catch (e) {
         console.warn('[SmartTabManager] Failed to query tabGroups:', e.message);
       }
     }
 
-    // Mode options
-    const autoGroup = settings.autoGroup ?? false;
-    const createTabGroups = settings.vivaldiNativeStacking !== false;
-    const applyNames = settings.vivaldiApplyNames !== false;
-    const applyColors = settings.vivaldiApplyColors !== false;
-    const totalTabsCount = allTabs.length + pinnedTabs.length;
-    const totalThreshold = Number(settings.totalThreshold ?? 5);
-    const groupThreshold = Number(settings.groupThreshold ?? 3);
-
-    console.log('[SmartTabManager] Organization flags:', {
-      createTabGroups,
-      applyNames,
-      applyColors,
-      autoGroup,
-      totalTabsCount
-    });
-
-    // Map existing groups by title
     const groupMap = new Map();
     existingGroups.forEach(g => {
       if (g.title) {
@@ -191,10 +183,8 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
       });
     }
 
-    // 4. Sort groups and tabs
-    const strategy = settings.sortStrategy || 'alphabetical';
+    // 4. Sort groups and determine desired tab order
     let groupedKeys = [...new Set(tabGroupAssignments.map(a => a.groupKey))];
-    console.log('[SmartTabManager] Identified Group Keys:', groupedKeys);
 
     if (strategy === 'alphabetical') {
       groupedKeys.sort();
@@ -226,12 +216,12 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
       }
     }
 
-    // Account for pinned tabs so we never try to move unpinned tabs to pinned positions
-    let currentIndex = pinnedTabs.length;
+    // Build map of sorted assignments per group and full targetTabOrder
+    const groupAssignmentsMap = new Map();
+    const targetTabOrder = [];
 
     for (const key of groupedKeys) {
       const groupAssignments = tabGroupAssignments.filter(a => a.groupKey === key);
-
       if (strategy === 'alphabetical' || strategy === 'activeFirst') {
         groupAssignments.sort((a, b) => {
           const hostA = a.hostname || '';
@@ -241,156 +231,181 @@ export async function groupTabs(manualTrigger = false, forcedActiveTabId = null,
           return (a.url || '').localeCompare(b.url || '');
         });
       }
+      groupAssignmentsMap.set(key, groupAssignments);
+      for (const a of groupAssignments) {
+        targetTabOrder.push(a.tabId);
+      }
+    }
+    for (const tid of internalTabs) {
+      targetTabOrder.push(tid);
+    }
 
-      const tabsInGroup = groupAssignments.map(a => a.tabId);
-      if (tabsInGroup.length === 0) continue;
+    const currentTabIds = allTabs.map(t => t.id);
+    const isOrderIdentical = currentTabIds.length === targetTabOrder.length &&
+      currentTabIds.every((id, idx) => id === targetTabOrder[idx]);
 
-      console.log(`[SmartTabManager] Processing Group "${key}" with ${tabsInGroup.length} tabs:`, tabsInGroup);
+    let trackedTabIds = [...currentTabIds];
+    const pinnedCount = pinnedTabs.length;
+    let currentIndex = pinnedCount;
 
-      try {
-        let groupId = groupMap.get(key);
+    // Move tabs ONLY if reorganization is allowed and order is not already identical
+    if (canMoveTabs && !isOrderIdentical) {
+      console.log('[SmartTabManager] Tab order needs updating. Moving out-of-order tabs...');
+      for (const key of groupedKeys) {
+        const assignments = groupAssignmentsMap.get(key) || [];
+        const tabsInGroup = assignments.map(a => a.tabId);
+        if (tabsInGroup.length === 0) continue;
 
-        // Check if tabs are already consecutive and assigned to this group
-        let shouldReorganize = (autoGroup || (manualTrigger && !forceMode)) || !groupId;
-        if (groupId) {
-          const allAlreadyInGroup = tabsInGroup.every(tid => {
-            const assignment = tabGroupAssignments.find(a => a.tabId === tid);
-            return assignment && assignment.currentGroupId === groupId;
-          });
-          if (allAlreadyInGroup && !manualTrigger) {
-            shouldReorganize = false;
-          }
-        }
+        const sliceStart = currentIndex - pinnedCount;
+        const currentSlice = trackedTabIds.slice(sliceStart, sliceStart + tabsInGroup.length);
+        const isGroupInPlace = currentSlice.length === tabsInGroup.length &&
+          currentSlice.every((id, idx) => id === tabsInGroup[idx]);
 
-        // Move tabs contiguously if reorganization is needed
-        if (shouldReorganize) {
+        if (!isGroupInPlace) {
           try {
             await chrome.tabs.move(tabsInGroup, { index: currentIndex });
-            currentIndex += tabsInGroup.length;
           } catch (moveError) {
             console.warn(`[SmartTabManager] Batch move failed for group "${key}", moving sequentially:`, moveError.message);
+            let seqIdx = currentIndex;
             for (const tabId of tabsInGroup) {
               try {
-                await chrome.tabs.move(tabId, { index: currentIndex });
-                currentIndex++;
+                await chrome.tabs.move(tabId, { index: seqIdx++ });
               } catch (seqError) {
                 console.warn(`[SmartTabManager] Failed to move tab ${tabId}:`, seqError.message);
               }
             }
           }
-        } else {
-          currentIndex += tabsInGroup.length;
+          // Update tracked array
+          const remaining = trackedTabIds.filter(id => !tabsInGroup.includes(id));
+          remaining.splice(sliceStart, 0, ...tabsInGroup);
+          trackedTabIds = remaining;
         }
+        currentIndex += tabsInGroup.length;
+      }
+    } else {
+      console.log('[SmartTabManager] Tab order already identical or tab movement disabled. Skipping tabs.move.');
+    }
 
-        // Group tabs
-        if (createTabGroups) {
-          // --- Method A: Chromium Tab Groups API (VB-131507) ---
-          if (hasTabsGroupApi) {
+    // 5. Handle Folders (Tab Groups) when createTabGroups is enabled
+    if (createTabGroups && hasTabsGroupApi) {
+      for (const key of groupedKeys) {
+        const assignments = groupAssignmentsMap.get(key) || [];
+        const tabsInGroup = assignments.map(a => a.tabId);
+        if (tabsInGroup.length === 0) continue;
+
+        try {
+          let groupId = groupMap.get(key);
+          if (!groupId) {
+            const matchingTab = allTabs.find(t => tabsInGroup.includes(t.id) && t.groupId && t.groupId !== -1 && t.groupId !== chrome.tabGroups?.TAB_GROUP_ID_NONE);
+            if (matchingTab) groupId = matchingTab.groupId;
+          }
+
+          // Check if tabs are already grouped exclusively in groupId
+          const isAlreadyFullyGrouped = !!groupId &&
+            tabsInGroup.every(tid => {
+              const tab = allTabs.find(t => t.id === tid);
+              return tab && tab.groupId === groupId;
+            }) &&
+            !allTabs.some(t => t.groupId === groupId && !tabsInGroup.includes(t.id));
+
+          if (!isAlreadyFullyGrouped) {
             const groupOptions = { tabIds: tabsInGroup };
             if (groupId !== undefined && groupId !== null && groupId !== chrome.tabGroups?.TAB_GROUP_ID_NONE) {
               groupOptions.groupId = groupId;
             }
 
-            console.log(`[SmartTabManager] Calling chrome.tabs.group for "${key}" with options:`, groupOptions);
             try {
               groupId = await chrome.tabs.group(groupOptions);
-              console.log(`[SmartTabManager] chrome.tabs.group succeeded for "${key}", groupId: ${groupId}`);
               groupMap.set(key, groupId);
             } catch (groupError) {
               console.warn(`[SmartTabManager] Grouping failed with groupId for "${key}", creating new group:`, groupError.message);
               try {
                 groupId = await chrome.tabs.group({ tabIds: tabsInGroup });
-                console.log(`[SmartTabManager] chrome.tabs.group retry succeeded for "${key}", groupId: ${groupId}`);
                 groupMap.set(key, groupId);
               } catch (retryError) {
                 console.error(`[SmartTabManager] Failed to group tabs for "${key}":`, retryError);
                 groupId = undefined;
               }
             }
+          }
 
-            // Apply group title and color using standard Chromium tabGroups API
-            if (groupId && hasTabGroupsApi) {
-              const colorResult = getColorForKey(key);
-              const updateProps = {};
+          // Apply group title and color
+          if (groupId && hasTabGroupsApi) {
+            const existingGroup = existingGroups.find(g => g.id === groupId);
+            const colorResult = getColorForKey(key);
+            const updateProps = {};
 
-              if (applyNames) updateProps.title = key;
-              if (applyColors) updateProps.color = colorResult.name;
+            if (applyNames && (!existingGroup || existingGroup.title !== key)) {
+              updateProps.title = key;
+            }
+            if (applyColors && (!existingGroup || existingGroup.color !== colorResult.name)) {
+              updateProps.color = colorResult.name;
+            }
 
-              if (Object.keys(updateProps).length > 0) {
-                console.log(`[SmartTabManager] Updating group ${groupId} ("${key}") with:`, updateProps);
-                try {
-                  await chrome.tabGroups.update(groupId, updateProps);
-                  console.log(`[SmartTabManager] Group ${groupId} title/color updated successfully.`);
-                } catch (updateError) {
-                  console.warn(`[SmartTabManager] Failed to update title/color for "${key}":`, updateError.message);
-                  if (updateProps.title) {
-                    try {
-                      await chrome.tabGroups.update(groupId, { title: updateProps.title });
-                    } catch (fallbackError) {
-                      console.warn(`[SmartTabManager] Title fallback failed:`, fallbackError.message);
-                    }
+            if (Object.keys(updateProps).length > 0) {
+              try {
+                await chrome.tabGroups.update(groupId, updateProps);
+              } catch (updateError) {
+                console.warn(`[SmartTabManager] Failed to update title/color for "${key}":`, updateError.message);
+                if (updateProps.title) {
+                  try {
+                    await chrome.tabGroups.update(groupId, { title: updateProps.title });
+                  } catch (fallbackError) {
+                    console.warn(`[SmartTabManager] Title fallback failed:`, fallbackError.message);
                   }
                 }
               }
+            }
 
-              // Handle Collapsing (Tidy Mode) separately
-              let targetCollapsed = null;
-              if (forceMode === 'collapseAll') {
-                targetCollapsed = true;
-              } else if (forceMode === 'expandAll') {
+            // Handle Collapsing (Tidy Mode)
+            let targetCollapsed = null;
+            if (forceMode === 'collapseAll') {
+              targetCollapsed = true;
+            } else if (forceMode === 'expandAll') {
+              targetCollapsed = false;
+            } else if (settings.collapseGroups) {
+              const containsActiveTab = tabsInGroup.includes(activeTabId);
+              const meetsTotalThreshold = totalTabsCount >= totalThreshold;
+              const meetsGroupThreshold = tabsInGroup.length >= groupThreshold;
+
+              if (containsActiveTab) {
                 targetCollapsed = false;
-              } else if (settings.collapseGroups) {
-                const containsActiveTab = tabsInGroup.includes(activeTabId);
-                const meetsTotalThreshold = totalTabsCount >= totalThreshold;
-                const meetsGroupThreshold = tabsInGroup.length >= groupThreshold;
-
-                if (containsActiveTab) {
-                  targetCollapsed = false;
-                } else if (meetsTotalThreshold && meetsGroupThreshold) {
-                  targetCollapsed = true;
-                } else {
-                  targetCollapsed = false;
-                }
-              } else if (manualTrigger || !groupMap.has(key)) {
+              } else if (meetsTotalThreshold && meetsGroupThreshold) {
+                targetCollapsed = true;
+              } else {
                 targetCollapsed = false;
               }
+            } else if (manualTrigger || !existingGroup) {
+              targetCollapsed = false;
+            }
 
-              if (targetCollapsed !== null) {
-                try {
-                  await chrome.tabGroups.update(groupId, { collapsed: targetCollapsed });
-                } catch (collapseError) {
-                  console.debug(`[SmartTabManager] Collapsed update not applied for "${key}":`, collapseError.message);
-                }
+            if (targetCollapsed !== null && (!existingGroup || existingGroup.collapsed !== targetCollapsed)) {
+              try {
+                await chrome.tabGroups.update(groupId, { collapsed: targetCollapsed });
+              } catch (collapseError) {
+                console.debug(`[SmartTabManager] Collapsed update not applied for "${key}":`, collapseError.message);
               }
             }
           }
-        } else {
-          // Folders turned off: ungroup tabs via standard API
-          if (hasTabsGroupApi) {
-            try {
-              await chrome.tabs.ungroup(tabsInGroup);
-            } catch (e) {}
-          }
-          groupId = undefined;
+        } catch (e) {
+          console.warn(`[SmartTabManager] Could not process group "${key}":`, e.message);
+          continue;
         }
-      } catch (e) {
-        console.warn(`[SmartTabManager] Could not process group "${key}":`, e.message);
-        continue;
       }
-    }
 
-    // 5. Handle internal/new tabs (keep them ungrouped)
-    if (internalTabs.length > 0 && (autoGroup || manualTrigger)) {
-      try {
-        const groupedInternalTabs = allTabs
-          .filter(t => internalTabs.includes(t.id) && t.groupId && t.groupId !== chrome.tabGroups?.TAB_GROUP_ID_NONE)
-          .map(t => t.id);
+      // 6. Handle internal/new tabs (keep them ungrouped)
+      if (internalTabs.length > 0 && (autoGroup || manualTrigger)) {
+        try {
+          const groupedInternalTabs = allTabs
+            .filter(t => internalTabs.includes(t.id) && t.groupId && t.groupId !== -1 && t.groupId !== chrome.tabGroups?.TAB_GROUP_ID_NONE)
+            .map(t => t.id);
 
-        if (groupedInternalTabs.length > 0 && hasTabsGroupApi) {
-          await chrome.tabs.ungroup(groupedInternalTabs);
+          if (groupedInternalTabs.length > 0) {
+            await chrome.tabs.ungroup(groupedInternalTabs);
+          }
+        } catch (e) {
+          console.warn('[SmartTabManager] Could not ungroup internal tabs:', e.message);
         }
-      } catch (e) {
-        console.warn('[SmartTabManager] Could not ungroup internal tabs:', e.message);
       }
     }
 
@@ -441,17 +456,17 @@ function findFuzzyMatch(tab, fuse) {
   return 'Other';
 }
 
-function getColorForKey(key) {
+export function getColorForKey(key) {
   const colorMap = [
-    { name: 'grey', hex: '#5F6368', vivaldiId: 'color1', vivaldiIndex: 1 },
-    { name: 'blue', hex: '#1A73E8', vivaldiId: 'color2', vivaldiIndex: 2 },
-    { name: 'red', hex: '#D93025', vivaldiId: 'color3', vivaldiIndex: 3 },
-    { name: 'yellow', hex: '#F9AB00', vivaldiId: 'color4', vivaldiIndex: 4 },
-    { name: 'green', hex: '#1E8E3E', vivaldiId: 'color5', vivaldiIndex: 5 },
-    { name: 'pink', hex: '#D01884', vivaldiId: 'color6', vivaldiIndex: 6 },
-    { name: 'purple', hex: '#9334E6', vivaldiId: 'color7', vivaldiIndex: 7 },
-    { name: 'cyan', hex: '#12B5CB', vivaldiId: 'color8', vivaldiIndex: 8 },
-    { name: 'orange', hex: '#E8710A', vivaldiId: 'color9', vivaldiIndex: 9 }
+    { name: 'grey', hex: '#5F6368' },
+    { name: 'blue', hex: '#1A73E8' },
+    { name: 'red', hex: '#D93025' },
+    { name: 'yellow', hex: '#F9AB00' },
+    { name: 'green', hex: '#1E8E3E' },
+    { name: 'pink', hex: '#D01884' },
+    { name: 'purple', hex: '#9334E6' },
+    { name: 'cyan', hex: '#12B5CB' },
+    { name: 'orange', hex: '#E8710A' }
   ];
   let hash = 0;
   for (let i = 0; i < key.length; i++) {

@@ -1,13 +1,13 @@
-import { groupTabs } from './grouping.js';
+import { groupTabs, isInternalUrl } from './grouping.js';
 
 chrome.runtime.onInstalled.addListener((details) => {
   chrome.storage.sync.get(null, (currentSettings) => {
     const defaultSettings = {
       autoGroup: false,
       collapseGroups: false,
-      vivaldiNativeStacking: true, // Arrange in folders/stacks
-      vivaldiApplyNames: true,     // Name folders/stacks
-      vivaldiApplyColors: true,    // Colorize folders/stacks
+      arrangeInFolders: true,     // Arrange in folders/tab groups
+      applyFolderNames: true,     // Name folders/tab groups
+      applyFolderColors: true,    // Colorize folders/tab groups
       groupMode: 'domain',         // 'domain', 'subdomain', 'keyword'
       keywords: [],
       totalThreshold: 5,
@@ -15,10 +15,33 @@ chrome.runtime.onInstalled.addListener((details) => {
       sortStrategy: 'alphabetical'
     };
     
-    // Only set defaults for keys that don't exist yet
+    // Migrate legacy vivaldi keys if present
     const settingsToSet = {};
+    if (currentSettings.arrangeInFolders === undefined) {
+      if (currentSettings.vivaldiNativeStacking !== undefined) {
+        settingsToSet.arrangeInFolders = currentSettings.vivaldiNativeStacking;
+      } else {
+        settingsToSet.arrangeInFolders = defaultSettings.arrangeInFolders;
+      }
+    }
+    if (currentSettings.applyFolderNames === undefined) {
+      if (currentSettings.vivaldiApplyNames !== undefined) {
+        settingsToSet.applyFolderNames = currentSettings.vivaldiApplyNames;
+      } else {
+        settingsToSet.applyFolderNames = defaultSettings.applyFolderNames;
+      }
+    }
+    if (currentSettings.applyFolderColors === undefined) {
+      if (currentSettings.vivaldiApplyColors !== undefined) {
+        settingsToSet.applyFolderColors = currentSettings.vivaldiApplyColors;
+      } else {
+        settingsToSet.applyFolderColors = defaultSettings.applyFolderColors;
+      }
+    }
+
+    // Only set defaults for keys that don't exist yet
     for (const key in defaultSettings) {
-      if (currentSettings[key] === undefined) {
+      if (currentSettings[key] === undefined && settingsToSet[key] === undefined) {
         settingsToSet[key] = defaultSettings[key];
       }
     }
@@ -40,8 +63,8 @@ function debouncedGroupTabs(manual = false, forcedTabId = null, forceMode = null
 
 // Listen for browser startup
 chrome.runtime.onStartup.addListener(() => {
-  chrome.storage.sync.get(['autoGroup', 'collapseGroups'], (settings) => {
-    if (settings.autoGroup || settings.collapseGroups) {
+  chrome.storage.sync.get(['autoGroup'], (settings) => {
+    if (settings.autoGroup) {
       debouncedGroupTabs();
     }
   });
@@ -50,8 +73,8 @@ chrome.runtime.onStartup.addListener(() => {
 // Listen for tab updates (URL change or page load completion)
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' || changeInfo.url) {
-    chrome.storage.sync.get(['autoGroup', 'collapseGroups'], (settings) => {
-      if (settings.autoGroup || settings.collapseGroups) {
+    chrome.storage.sync.get(['autoGroup'], (settings) => {
+      if (settings.autoGroup) {
         debouncedGroupTabs();
       }
     });
@@ -59,18 +82,25 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 // Listen for tab creation
-chrome.tabs.onCreated.addListener(() => {
-  chrome.storage.sync.get(['autoGroup', 'collapseGroups'], (settings) => {
-    if (settings.autoGroup || settings.collapseGroups) {
-      debouncedGroupTabs();
-    }
-  });
+chrome.tabs.onCreated.addListener((tab) => {
+  // Empty/internal new tabs have no target URL yet; onUpdated will handle them when loaded.
+  if (tab.url && !isInternalUrl(tab.url)) {
+    chrome.storage.sync.get(['autoGroup'], (settings) => {
+      if (settings.autoGroup) {
+        debouncedGroupTabs();
+      }
+    });
+  }
 });
 
 // Listen for tab removal
 chrome.tabs.onRemoved.addListener(() => {
-  chrome.storage.sync.get(['autoGroup', 'collapseGroups'], (settings) => {
-    if (settings.autoGroup || settings.collapseGroups) {
+  chrome.storage.sync.get([
+    'autoGroup', 'collapseGroups',
+    'arrangeInFolders', 'vivaldiNativeStacking'
+  ], (settings) => {
+    const arrangeInFolders = settings.arrangeInFolders ?? settings.vivaldiNativeStacking ?? true;
+    if (settings.autoGroup || (arrangeInFolders && settings.collapseGroups)) {
       debouncedGroupTabs();
     }
   });
@@ -78,8 +108,14 @@ chrome.tabs.onRemoved.addListener(() => {
 
 // Listen for tab activation (switching active tab updates Tidy Mode collapsing)
 chrome.tabs.onActivated.addListener((activeInfo) => {
-  chrome.storage.sync.get(['autoGroup', 'collapseGroups'], (settings) => {
-    if (settings.autoGroup || settings.collapseGroups) {
+  chrome.storage.sync.get([
+    'autoGroup', 'collapseGroups', 'sortStrategy',
+    'arrangeInFolders', 'vivaldiNativeStacking'
+  ], (settings) => {
+    const arrangeInFolders = settings.arrangeInFolders ?? settings.vivaldiNativeStacking ?? true;
+    const needsTidyUpdate = arrangeInFolders && settings.collapseGroups;
+    const needsActiveFirstReorder = settings.autoGroup && settings.sortStrategy === 'activeFirst';
+    if (needsTidyUpdate || needsActiveFirstReorder) {
       debouncedGroupTabs(false, activeInfo.tabId);
     }
   });

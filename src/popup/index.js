@@ -9,9 +9,9 @@ const elements = {
   keywordSection: document.getElementById('keywordSection'),
   keywordInput: document.getElementById('keywordInput'),
   groupNowBtn: document.getElementById('groupNowBtn'),
-  vivaldiStackingToggle: document.getElementById('vivaldiStackingToggle'),
-  vivaldiNamesToggle: document.getElementById('vivaldiNamesToggle'),
-  vivaldiColorsToggle: document.getElementById('vivaldiColorsToggle'),
+  arrangeInFoldersToggle: document.getElementById('arrangeInFoldersToggle'),
+  applyFolderNamesToggle: document.getElementById('applyFolderNamesToggle'),
+  applyFolderColorsToggle: document.getElementById('applyFolderColorsToggle'),
   extraOptionsHeader: document.getElementById('extraOptionsHeader'),
   extraOptionsContent: document.getElementById('extraOptionsContent'),
   // closeAllBtn: document.getElementById('closeAllBtn'),
@@ -19,7 +19,11 @@ const elements = {
 };
 
 // Initialize settings from storage
-chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'groupMode', 'sortStrategy', 'keywords', 'vivaldiNativeStacking', 'vivaldiApplyNames', 'vivaldiApplyColors'], (settings) => {
+chrome.storage.sync.get([
+  'autoGroup', 'collapseGroups', 'totalThreshold', 'groupThreshold', 'groupMode', 'sortStrategy', 'keywords',
+  'arrangeInFolders', 'applyFolderNames', 'applyFolderColors',
+  'vivaldiNativeStacking', 'vivaldiApplyNames', 'vivaldiApplyColors'
+], (settings) => {
   elements.autoGroupToggle.checked = settings.autoGroup || false;
   elements.collapseToggle.checked = settings.collapseGroups ?? false;
   elements.totalThreshold.value = settings.totalThreshold || 5;
@@ -27,9 +31,9 @@ chrome.storage.sync.get(['autoGroup', 'collapseGroups', 'totalThreshold', 'group
   elements.groupMode.value = settings.groupMode || 'domain';
   elements.sortStrategy.value = settings.sortStrategy || 'alphabetical';
   elements.keywordInput.value = (settings.keywords || []).join(', ');
-  elements.vivaldiStackingToggle.checked = settings.vivaldiNativeStacking ?? true;
-  elements.vivaldiNamesToggle.checked = settings.vivaldiApplyNames ?? true;
-  elements.vivaldiColorsToggle.checked = settings.vivaldiApplyColors ?? true;
+  elements.arrangeInFoldersToggle.checked = settings.arrangeInFolders ?? settings.vivaldiNativeStacking ?? true;
+  elements.applyFolderNamesToggle.checked = settings.applyFolderNames ?? settings.vivaldiApplyNames ?? true;
+  elements.applyFolderColorsToggle.checked = settings.applyFolderColors ?? settings.vivaldiApplyColors ?? true;
   
   toggleKeywordSection(elements.groupMode.value);
   toggleThresholdSettings(elements.collapseToggle.checked);
@@ -76,16 +80,19 @@ elements.keywordInput.addEventListener('input', () => {
   chrome.storage.sync.set({ keywords });
 });
 
-elements.vivaldiStackingToggle.addEventListener('change', () => {
-  chrome.storage.sync.set({ vivaldiNativeStacking: elements.vivaldiStackingToggle.checked });
+elements.arrangeInFoldersToggle.addEventListener('change', () => {
+  const checked = elements.arrangeInFoldersToggle.checked;
+  chrome.storage.sync.set({ arrangeInFolders: checked, vivaldiNativeStacking: checked });
 });
 
-elements.vivaldiNamesToggle.addEventListener('change', () => {
-  chrome.storage.sync.set({ vivaldiApplyNames: elements.vivaldiNamesToggle.checked });
+elements.applyFolderNamesToggle.addEventListener('change', () => {
+  const checked = elements.applyFolderNamesToggle.checked;
+  chrome.storage.sync.set({ applyFolderNames: checked, vivaldiApplyNames: checked });
 });
 
-elements.vivaldiColorsToggle.addEventListener('change', () => {
-  chrome.storage.sync.set({ vivaldiApplyColors: elements.vivaldiColorsToggle.checked });
+elements.applyFolderColorsToggle.addEventListener('change', () => {
+  const checked = elements.applyFolderColorsToggle.checked;
+  chrome.storage.sync.set({ applyFolderColors: checked, vivaldiApplyColors: checked });
 });
 
 /* 
